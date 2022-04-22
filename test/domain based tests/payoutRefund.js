@@ -124,6 +124,48 @@ describe(scriptName, () => {
       ).to.be.equal((env.reportingAmount * compensationPercentage) / 100);
     });
 
+    it('should revert if reported address tries to retrieve compensation using method allowed only by CONTRACTS', async () => {
+      await ethers.provider.send('evm_increaseTime', [
+        Number(time.duration.minutes(5)),
+      ]);
+
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker1.address, env.stakingAmount + env.stakingAmount);
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker2.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker3.address, env.stakingAmount * 2);
+
+      await env.lssToken.connect(adr.staker1)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.staker2)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.staker3)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+
+      await ethers.provider.send('evm_increaseTime', [
+        Number(time.duration.minutes(5)),
+      ]);
+
+      await env.lssStaking.connect(adr.staker1).stake(1);
+      await env.lssStaking.connect(adr.staker2).stake(1);
+      await env.lssStaking.connect(adr.staker3).stake(1);
+
+      await env.lssGovernance.connect(adr.lssAdmin).resolveReport(1);
+
+      expect(
+        await env.lssGovernance.isReportSolved(1),
+      ).to.be.equal(true);
+
+      expect(
+        await env.lssGovernance.reportResolution(1),
+      ).to.be.equal(false);
+
+      await expect(
+        env.lssGovernance.connect(adr.maliciousActor1).retrieveContractCompensation(),
+      ).to.be.revertedWith('LSS: Caller is not contract');
+    });
+
     it('should revert if tries to retrieve twice', async () => {
       await ethers.provider.send('evm_increaseTime', [
         Number(time.duration.minutes(5)),
@@ -293,6 +335,85 @@ describe(scriptName, () => {
         adr.maliciousActor1.address,
         20,
       );
+    });
+  });
+
+  describe('when everyone votes CONTRACT negatively', () => {
+    const reportId = 3;
+    let reportedContract;
+
+    beforeEach(async () => {
+      const reportedContractFactory = await ethers.getContractFactory('ReportedContract');
+      reportedContract = await reportedContractFactory.deploy();
+      await lerc20Token.connect(adr.lerc20InitialHolder).transfer(reportedContract.address, 1000);
+
+      await env.lssReporting.connect(adr.reporter1)
+        .report(lerc20Token.address, reportedContract.address);
+
+      await env.lssGovernance.connect(adr.lssAdmin).losslessVote(reportId, false);
+      await env.lssGovernance.connect(adr.lerc20Admin).tokenOwnersVote(reportId, false);
+      await env.lssGovernance.connect(adr.member1).committeeMemberVote(reportId, false);
+      await env.lssGovernance.connect(adr.member2).committeeMemberVote(reportId, false);
+      await env.lssGovernance.connect(adr.member3).committeeMemberVote(reportId, false);
+      await env.lssGovernance.connect(adr.member4).committeeMemberVote(reportId, false);
+    });
+
+    it('should let reported CONTRACT retrieve compensation', async () => {
+      await ethers.provider.send('evm_increaseTime', [
+        Number(time.duration.minutes(5)),
+      ]);
+
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker1.address, env.stakingAmount + env.stakingAmount);
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker2.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.lssInitialHolder)
+        .transfer(adr.staker3.address, env.stakingAmount * 2);
+
+      await env.lssToken.connect(adr.staker1)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.staker2)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+      await env.lssToken.connect(adr.staker3)
+        .approve(env.lssStaking.address, env.stakingAmount * 2);
+
+      await ethers.provider.send('evm_increaseTime', [
+        Number(time.duration.minutes(5)),
+      ]);
+
+      await env.lssStaking.connect(adr.staker1).stake(reportId);
+      await env.lssStaking.connect(adr.staker2).stake(reportId);
+      await env.lssStaking.connect(adr.staker3).stake(reportId);
+
+      await env.lssGovernance.connect(adr.lssAdmin).resolveReport(reportId);
+
+      expect(
+        await env.lssGovernance.isReportSolved(reportId),
+      ).to.be.equal(true);
+
+      expect(
+        await env.lssGovernance.reportResolution(reportId),
+      ).to.be.equal(false);
+
+      await expect(
+        reportedContract.connect(adr.maliciousActor1).retrieveContractCompensation(env.lssGovernance.address),
+      ).to.emit(env.lssGovernance, 'CompensationRetrieval').withArgs(
+        reportedContract.address,
+        20,
+      );
+
+      // await expect(
+      //   env.lssGovernance.connect(adr.maliciousActor1).retrieveContractCompensation(),
+      // ).to.emit(env.lssGovernance, 'CompensationRetrieval').withArgs(
+      //   reportedContract.address,
+      //   20,
+      // );
+
+      const compensationPercentage = await env.lssGovernance.compensationPercentage();
+
+      expect(
+        await env.lssToken.balanceOf(reportedContract.address),
+      ).to.be.equal((env.reportingAmount * compensationPercentage) / 100);
     });
   });
 });
