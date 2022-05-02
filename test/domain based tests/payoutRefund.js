@@ -124,48 +124,6 @@ describe(scriptName, () => {
       ).to.be.equal((env.reportingAmount * compensationPercentage) / 100);
     });
 
-    it('should revert if reported address tries to retrieve compensation using method allowed only by CONTRACTS', async () => {
-      await ethers.provider.send('evm_increaseTime', [
-        Number(time.duration.minutes(5)),
-      ]);
-
-      await env.lssToken.connect(adr.lssInitialHolder)
-        .transfer(adr.staker1.address, env.stakingAmount + env.stakingAmount);
-      await env.lssToken.connect(adr.lssInitialHolder)
-        .transfer(adr.staker2.address, env.stakingAmount * 2);
-      await env.lssToken.connect(adr.lssInitialHolder)
-        .transfer(adr.staker3.address, env.stakingAmount * 2);
-
-      await env.lssToken.connect(adr.staker1)
-        .approve(env.lssStaking.address, env.stakingAmount * 2);
-      await env.lssToken.connect(adr.staker2)
-        .approve(env.lssStaking.address, env.stakingAmount * 2);
-      await env.lssToken.connect(adr.staker3)
-        .approve(env.lssStaking.address, env.stakingAmount * 2);
-
-      await ethers.provider.send('evm_increaseTime', [
-        Number(time.duration.minutes(5)),
-      ]);
-
-      await env.lssStaking.connect(adr.staker1).stake(1);
-      await env.lssStaking.connect(adr.staker2).stake(1);
-      await env.lssStaking.connect(adr.staker3).stake(1);
-
-      await env.lssGovernance.connect(adr.lssAdmin).resolveReport(1);
-
-      expect(
-        await env.lssGovernance.isReportSolved(1),
-      ).to.be.equal(true);
-
-      expect(
-        await env.lssGovernance.reportResolution(1),
-      ).to.be.equal(false);
-
-      await expect(
-        env.lssGovernance.connect(adr.maliciousActor1).retrieveContractCompensation(),
-      ).to.be.revertedWith('LSS: Caller is not contract');
-    });
-
     it('should revert if tries to retrieve twice', async () => {
       await ethers.provider.send('evm_increaseTime', [
         Number(time.duration.minutes(5)),
@@ -395,24 +353,20 @@ describe(scriptName, () => {
         await env.lssGovernance.reportResolution(reportId),
       ).to.be.equal(false);
 
+      const wallet = '0xA13733197aDb51EDd6b9683436Fe876D8258F565';
+
       await expect(
-        reportedContract.connect(adr.maliciousActor1).retrieveContractCompensation(env.lssGovernance.address),
-      ).to.emit(env.lssGovernance, 'CompensationRetrieval').withArgs(
+        env.lssGovernance.connect(adr.lssAdmin).retrieveContractCompensation(reportedContract.address, wallet),
+      ).to.emit(env.lssGovernance, 'ContractCompensationRetrieval').withArgs(
         reportedContract.address,
+        wallet,
         20,
       );
-
-      // await expect(
-      //   env.lssGovernance.connect(adr.maliciousActor1).retrieveContractCompensation(),
-      // ).to.emit(env.lssGovernance, 'CompensationRetrieval').withArgs(
-      //   reportedContract.address,
-      //   20,
-      // );
 
       const compensationPercentage = await env.lssGovernance.compensationPercentage();
 
       expect(
-        await env.lssToken.balanceOf(reportedContract.address),
+        await env.lssToken.balanceOf(wallet),
       ).to.be.equal((env.reportingAmount * compensationPercentage) / 100);
     });
   });

@@ -571,18 +571,18 @@ contract LosslessGovernance is ILssGovernance, Initializable, AccessControlUpgra
 
     }
 
-    function retrieveContractCompensation() override public whenNotPaused {
-        require(isContract(msg.sender), "LSS: Caller is not contract");
-        require(!compensation[msg.sender].payed, "LSS: Already retrieved");
-        require(compensation[msg.sender].amount != 0, "LSS: No retribution assigned");
+    function retrieveContractCompensation(address _reportedContract, address _wallet) override public whenNotPaused onlyLosslessAdmin {
+        require(isContract(_reportedContract), "LSS: Caller is not contract");
+        require(!compensation[_reportedContract].payed, "LSS: Already retrieved");
+        require(compensation[_reportedContract].amount != 0, "LSS: No retribution assigned");
         
-        compensation[msg.sender].payed = true;
+        compensation[_reportedContract].payed = true;
 
-        losslessReporting.retrieveCompensation(msg.sender, compensation[msg.sender].amount);
+        losslessReporting.retrieveCompensation(_wallet, compensation[_reportedContract].amount);
 
-        emit CompensationRetrieval(msg.sender, compensation[msg.sender].amount);
+        emit ContractCompensationRetrieval(_reportedContract, _wallet, compensation[_reportedContract].amount);
 
-        compensation[msg.sender].amount = 0;
+        compensation[_reportedContract].amount = 0;
 
     }
 

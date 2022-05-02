@@ -33,7 +33,7 @@ interface ILssGovernance {
     function rejectWallet(uint256 _reportId) external;
     function retrieveFunds(uint256 _reportId) external;
     function retrieveCompensation() external;
-    function retrieveContractCompensation() external;
+    function retrieveContractCompensation(address _reportedContract, address _wallet) external;
     function claimCommitteeReward(uint256 _reportId) external;
     function setCompensationAmount(uint256 _amount) external;
     function losslessClaim(uint256 _reportId) external;
@@ -57,6 +57,7 @@ interface ILssGovernance {
     event WalletRejection(uint256 indexed _reportId);
     event FundsRetrieval(uint256 indexed _reportId, uint256 indexed _amount);
     event CompensationRetrieval(address indexed _wallet, uint256 indexed _amount);
+    event ContractCompensationRetrieval(address indexed _contract, address indexed _wallet, uint256 indexed _amount);
     event LosslessClaim(ILERC20 indexed _token, uint256 indexed _reportID, uint256 indexed _amount);
     event NewCompensationPercentage(uint256 indexed _compensationPercentage);
     event NewRevshareAdmin(address indexed _revshareAdmin);
